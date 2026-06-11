@@ -40,6 +40,11 @@ fun MainScreen(onShowAbout: () -> Unit) {
     var refreshTrigger by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
 
+    /**
+     * 刷新配置显示。
+     * @param delayed true 时延迟 800ms 再刷新，用于 Instrumentation fallback 路径，
+     *               因为 overrideConfig 是异步执行的，需要等待配置写入完成后再读取。
+     */
     fun refreshConfig(delayed: Boolean) {
         if (delayed) {
             scope.launch {

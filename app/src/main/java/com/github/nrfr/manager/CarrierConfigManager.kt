@@ -113,6 +113,10 @@ object CarrierConfigManager {
         return overrideCarrierConfig(context, subId, null)
     }
 
+    /**
+     * 覆盖运营商配置。
+     * @return true 表示走了 Instrumentation fallback 路径（需要延迟刷新 UI），false 表示直接成功
+     */
     private fun overrideCarrierConfig(context: Context, subId: Int, bundle: PersistableBundle?): Boolean {
         val carrierConfigLoader = ICarrierConfigLoader.Stub.asInterface(
             ShizukuBinderWrapper(
@@ -127,6 +131,7 @@ object CarrierConfigManager {
             return false
         } catch (e: SecurityException) {
             if (e.message?.contains("cannot be invoked by shell") == true) {
+                // Android 16+ 禁止 shell 调用 overrideConfig，走 Instrumentation fallback
                 PrivilegedCarrierConfigRunner.overrideConfig(context, subId, bundle)
                 return true
             } else {

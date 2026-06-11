@@ -19,7 +19,6 @@ import rikka.shizuku.ShizukuBinderWrapper
 private const val ARG_CALLER_PID = "caller_pid"
 private const val ARG_SUB_ID = "sub_id"
 private const val ARG_CONFIG = "config"
-private const val ARG_RESET = "reset"
 
 object PrivilegedCarrierConfigRunner {
     init {
@@ -31,7 +30,6 @@ object PrivilegedCarrierConfigRunner {
         val args = Bundle().apply {
             putInt(ARG_CALLER_PID, Process.myPid())
             putInt(ARG_SUB_ID, subId)
-            putBoolean(ARG_RESET, bundle == null)
             if (bundle != null) {
                 putParcelable(ARG_CONFIG, bundle)
             }
@@ -40,8 +38,7 @@ object PrivilegedCarrierConfigRunner {
         val activity = ServiceManager.getService(Context.ACTIVITY_SERVICE)
         val activityManager = IActivityManager.Stub.asInterface(ShizukuBinderWrapper(activity))
         val component = ComponentName(context, PrivilegedCarrierConfigInstrumentation::class.java)
-        val flags = ActivityManager.INSTR_FLAG_DISABLE_HIDDEN_API_CHECKS or
-            ActivityManager.INSTR_FLAG_NO_RESTART
+        val flags = ActivityManager.INSTR_FLAG_NO_RESTART
 
         activityManager.startInstrumentation(
             component,
@@ -97,7 +94,7 @@ class PrivilegedCarrierConfigInstrumentation : Instrumentation() {
     }
 
     private fun getPersistableBundle(arguments: Bundle): PersistableBundle? {
-        if (arguments.getBoolean(ARG_RESET)) {
+        if (!arguments.containsKey(ARG_CONFIG)) {
             return null
         }
 
