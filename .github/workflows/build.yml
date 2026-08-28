@@ -91,6 +91,9 @@ jobs:
         run: |
           if [ -n "$KEYSTORE" ]; then
             echo "$KEYSTORE" | base64 --decode > nrfr-release.jks
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+            echo "KEYSTORE_ALIAS=$KEYSTORE_ALIAS" >> $GITHUB_ENV
+            echo "KEYSTORE_ALIAS_PASSWORD=$KEYSTORE_ALIAS_PASSWORD" >> $GITHUB_ENV
           else
             keytool -genkeypair -v -keystore nrfr-release.jks -storepass nrfr \
               -alias nrfr -keypass nrfr -keyalg RSA -keysize 2048 -validity 10950 \
