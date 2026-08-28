@@ -12,33 +12,57 @@ import com.github.nrfr.model.SimCardInfo
 import rikka.shizuku.ShizukuBinderWrapper
 
 object CarrierConfigManager {
+    /**
+     * Android 17 (API 37) 起框架为这些隐藏接口标注了 @Nullable，需要显式做空安全处理
+     */
+    private fun getCarrierConfigLoader(): ICarrierConfigLoader? {
+        val binder = TelephonyFrameworkInitializer
+            .getTelephonyServiceManager()
+            ?.carrierConfigServiceRegisterer
+            ?.get()
+            ?: return null
+
+        return ICarrierConfigLoader.Stub.asInterface(ShizukuBinderWrapper(binder))
+    }
+
     fun getSimCards(context: Context): List<SimCardInfo> {
         val simCards = mutableListOf<SimCardInfo>()
-        val subId1 = SubscriptionManager.getSubId(0)
-        val subId2 = SubscriptionManager.getSubId(1)
 
-        if (subId1 != null) {
-            val config1 = getCurrentConfig(subId1[0])
-            simCards.add(SimCardInfo(1, subId1[0], getCarrierNameBySubId(context, subId1[0]), config1))
-        }
-        if (subId2 != null) {
-            val config2 = getCurrentConfig(subId2[0])
-            simCards.add(SimCardInfo(2, subId2[0], getCarrierNameBySubId(context, subId2[0]), config2))
+        for (slotIndex in 0..1) {
+            val subId = getSubIdForSlot(slotIndex) ?: continue
+            simCards.add(
+                SimCardInfo(
+                    slot = slotIndex + 1,
+                    subId = subId,
+                    carrierName = getCarrierNameBySubId(context, subId),
+                    currentConfig = getCurrentConfig(subId)
+                )
+            )
         }
 
         return simCards
     }
 
+    /**
+     * 获取指定卡槽的 subscription id，无卡或卡槽无效时返回 null。
+     * Android 14 (API 34) 起使用公开的 getSubscriptionId，旧版本回退到隐藏 API getSubId。
+     */
+    private fun getSubIdForSlot(slotIndex: Int): Int? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            SubscriptionManager.getSubscriptionId(slotIndex)
+                .takeIf { it != SubscriptionManager.INVALID_SUBSCRIPTION_ID }
+        } else {
+            @Suppress("DEPRECATION")
+            SubscriptionManager.getSubId(slotIndex)
+                ?.firstOrNull()
+                ?.takeIf { it != SubscriptionManager.INVALID_SUBSCRIPTION_ID }
+        }
+    }
+
     private fun getCurrentConfig(subId: Int): Map<String, String> {
         try {
-            val carrierConfigLoader = ICarrierConfigLoader.Stub.asInterface(
-                ShizukuBinderWrapper(
-                    TelephonyFrameworkInitializer
-                        .getTelephonyServiceManager()
-                        .carrierConfigServiceRegisterer
-                        .get()
-                )
-            )
+            val carrierConfigLoader = getCarrierConfigLoader() ?: return emptyMap()
+            @Suppress("DEPRECATION")
             val config = carrierConfigLoader.getConfigForSubId(subId, "com.github.nrfr") ?: return emptyMap()
 
             val result = mutableMapOf<String, String>()
@@ -118,14 +142,8 @@ object CarrierConfigManager {
      * @return true 表示走了 Instrumentation fallback 路径（需要延迟刷新 UI），false 表示直接成功
      */
     private fun overrideCarrierConfig(context: Context, subId: Int, bundle: PersistableBundle?): Boolean {
-        val carrierConfigLoader = ICarrierConfigLoader.Stub.asInterface(
-            ShizukuBinderWrapper(
-                TelephonyFrameworkInitializer
-                    .getTelephonyServiceManager()
-                    .carrierConfigServiceRegisterer
-                    .get()
-            )
-        )
+        val carrierConfigLoader = getCarrierConfigLoader()
+            ?: throw IllegalStateException("无法获取 CarrierConfigService")
         try {
             carrierConfigLoader.overrideConfig(subId, bundle, true)
             return false

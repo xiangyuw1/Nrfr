@@ -74,11 +74,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # 下载替换 android.jar
+      # 下载替换 android.jar（含隐藏 API，compileSdk 37 需要 AGP 9.1+）
       - name: Download android.jar
         run: |
-          mkdir -p $ANDROID_HOME/platforms/android-34
-          curl -L https://raw.githubusercontent.com/Reginer/aosp-android-jar/refs/heads/main/android-34/android.jar -o $ANDROID_HOME/platforms/android-34/android.jar
+          mkdir -p $ANDROID_HOME/platforms/android-37.0
+          curl -L https://raw.githubusercontent.com/Reginer/aosp-android-jar/refs/heads/main/android-37/android.jar -o $ANDROID_HOME/platforms/android-37.0/android.jar
         shell: bash
 
       # 构建 Android APK
