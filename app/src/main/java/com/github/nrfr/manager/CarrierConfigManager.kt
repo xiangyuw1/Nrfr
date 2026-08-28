@@ -148,13 +148,16 @@ object CarrierConfigManager {
             carrierConfigLoader.overrideConfig(subId, bundle, true)
             return false
         } catch (e: SecurityException) {
-            if (e.message?.contains("cannot be invoked by shell") == true) {
-                // Android 16+ 禁止 shell 调用 overrideConfig，走 Instrumentation fallback
-                PrivilegedCarrierConfigRunner.overrideConfig(context, subId, bundle)
-                return true
-            } else {
-                throw e
-            }
+            // 直接调用被框架拒绝时统一走 Instrumentation fallback：
+            // - Android 16+ 禁止 shell（uid 2000）调用 overrideConfig：
+            //   "overrideConfig cannot be invoked by shell"
+            // - Android 17 user 版上 root（uid 0）虽然能通过 MODIFY_PHONE_STATE 检查，
+            //   但 isSystemApp() 按 uid 反查不到包，persistent=true 也会被拒绝：
+            //   "overrideConfig with persistent=true only can be invoked by system app"
+            // Instrumentation + startDelegateShellPermissionIdentity 对 shell 和 root
+            // 身份的 Shizuku server 都可用，因此两种模式下 fallback 均可生效。
+            PrivilegedCarrierConfigRunner.overrideConfig(context, subId, bundle)
+            return true
         }
     }
 }
