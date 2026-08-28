@@ -81,12 +81,33 @@ jobs:
           curl -L https://raw.githubusercontent.com/Reginer/aosp-android-jar/refs/heads/main/android-37/android.jar -o $ANDROID_HOME/platforms/android-37.0/android.jar
         shell: bash
 
-      # 构建 Android APK
+      # 准备签名：有 secret 用正式 keystore，没有则生成临时 keystore 兜底
+      - name: Prepare signing key
+        env:
+          KEYSTORE: ${{ secrets.KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
+          KEYSTORE_ALIAS_PASSWORD: ${{ secrets.KEYSTORE_ALIAS_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE" ]; then
+            echo "$KEYSTORE" | base64 --decode > nrfr-release.jks
+          else
+            keytool -genkeypair -v -keystore nrfr-release.jks -storepass nrfr \
+              -alias nrfr -keypass nrfr -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=xiangyuw1,OU=NRFR,O=xiangyuw1,C=CN"
+            echo "KEYSTORE_PASSWORD=nrfr" >> $GITHUB_ENV
+            echo "KEYSTORE_ALIAS=nrfr" >> $GITHUB_ENV
+            echo "KEYSTORE_ALIAS_PASSWORD=nrfr" >> $GITHUB_ENV
+          fi
+          echo "KEYSTORE_FILE=../nrfr-release.jks" >> $GITHUB_ENV
+        shell: bash
+
+      # 构建 Android APK（release 签名版）
       - name: Build Android APK
         run: |
           gradle wrapper
           chmod +x ./gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
         shell: bash
 
       # 设置 Go 环境
@@ -124,8 +145,8 @@ jobs:
       # 复制 Android APK
       - name: Copy Android APK
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk nrfr-client/build/bin/resources/nrfr.apk
-          cp app/build/outputs/apk/debug/app-debug.apk nrfr-${{ steps.version.outputs.version }}.apk
+          cp app/build/outputs/apk/release/app-release.apk nrfr-client/build/bin/resources/nrfr.apk
+          cp app/build/outputs/apk/release/app-release.apk nrfr-${{ steps.version.outputs.version }}.apk
         shell: bash
 
       # 下载 platform-tools
